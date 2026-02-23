@@ -4,7 +4,7 @@
 		"annotations": [],
 		"type": "HttpServer",
 		"typeProperties": {
-			"url": "https://api.semanticscholar.org/graph/v1",
+			"url": "https://api.semanticscholar.org/graph/v1/",
 			"enableServerCertificateValidation": true,
 			"authenticationType": "Anonymous"
 		}
