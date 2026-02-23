@@ -21,7 +21,7 @@
 							"type": "HttpReadSettings",
 							"requestMethod": "GET",
 							"additionalHeaders": {
-								"value": "x-api-key: 99QH6t6XyW8IglwlSGBwe52aDYvxB9126vjdd8HG",
+								"value": "x-api-key: ------------------------,
 								"type": "Expression"
 							}
 						},
