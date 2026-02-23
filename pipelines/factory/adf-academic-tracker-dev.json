@@ -1,0 +1,9 @@
+{
+	"name": "adf-academic-tracker-dev",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "e022d149-c46b-426d-9b4b-3998d135d259",
+		"tenantId": "6d5c2f34-5e9d-4afd-bc13-435f63ad8432"
+	}
+}
