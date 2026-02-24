@@ -9,7 +9,7 @@
 					{
 						"activity": "getApiKey",
 						"dependencyConditions": [
-							"Skipped"
+							"Succeeded"
 						]
 					}
 				],
@@ -28,7 +28,7 @@
 							"type": "HttpReadSettings",
 							"requestMethod": "GET",
 							"additionalHeaders": {
-								"value": "@activity('getApiKey').output.value",
+								"value": "x-api-key: @{activity('getApiKey').output.value}",
 								"type": "Expression"
 							}
 						},
@@ -62,9 +62,16 @@
 				]
 			},
 			{
-				"name": "df_transform_papers",
+				"name": "transform_papers",
 				"type": "ExecuteDataFlow",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "copy_papers_from_api",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -75,7 +82,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"dataflow": {
-						"referenceName": "dataflow1",
+						"referenceName": "df_transform_papers",
 						"type": "DataFlowReference"
 					},
 					"compute": {
