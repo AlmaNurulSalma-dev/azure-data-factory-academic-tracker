@@ -1,0 +1,59 @@
+{
+	"name": "dataflow1",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_adls_papers_raw",
+						"type": "DatasetReference"
+					},
+					"name": "rawPapers"
+				}
+			],
+			"sinks": [],
+			"transformations": [
+				{
+					"name": "selectColumns"
+				},
+				{
+					"name": "flattenData"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          data as (abstract as string, authors as (authorId as long, name as string)[], citationCount as short, openAccessPdf as (disclaimer as string, license as string, status as string, url as string), paperId as string, title as string, year as short)[],",
+				"          next as short,",
+				"          offset as boolean,",
+				"          total as short",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     documentForm: 'documentPerLine') ~> rawPapers",
+				"flattenData select(mapColumn(",
+				"          abstract,",
+				"          authors,",
+				"          citationCount,",
+				"          paperId,",
+				"          title,",
+				"          year",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectColumns",
+				"rawPapers foldDown(unroll(data, data),",
+				"     mapColumn(",
+				"          abstract = data.abstract,",
+				"          authors = data.authors,",
+				"          citationCount = data.citationCount,",
+				"          paperId = data.paperId,",
+				"          title = data.title,",
+				"          year = data.year",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenData"
+			]
+		}
+	}
+}

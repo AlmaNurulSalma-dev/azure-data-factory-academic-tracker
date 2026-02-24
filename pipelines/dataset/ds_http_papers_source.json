@@ -11,7 +11,7 @@
 			"location": {
 				"type": "HttpServerLocation",
 				"relativeUrl": {
-					"value": "paper/search?query=machine+learning&fields=title,year&limit=10",
+					"value": "paper/search?query=machine+learning&fields=title,authors,year,citationCount,abstract&limit=10",
 					"type": "Expression"
 				}
 			}
