@@ -12,7 +12,15 @@
 					"name": "rawPapers"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_adls_papers_processed",
+						"type": "DatasetReference"
+					},
+					"name": "sinkProcessed"
+				}
+			],
 			"transformations": [
 				{
 					"name": "selectColumns"
@@ -72,7 +80,14 @@
 				"          authors",
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
-				"     skipDuplicateMapOutputs: true) ~> dropRawColumns"
+				"     skipDuplicateMapOutputs: true) ~> dropRawColumns",
+				"dropRawColumns sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sinkProcessed"
 			]
 		}
 	}
