@@ -19,6 +19,12 @@
 				},
 				{
 					"name": "flattenData"
+				},
+				{
+					"name": "transformColumns"
+				},
+				{
+					"name": "dropRawColumns"
 				}
 			],
 			"scriptLines": [
@@ -34,7 +40,7 @@
 				"     documentForm: 'documentPerLine') ~> rawPapers",
 				"flattenData select(mapColumn(",
 				"          abstract,",
-				"          authors,",
+				"          authors_raw = authors,",
 				"          citationCount,",
 				"          paperId,",
 				"          title,",
@@ -52,7 +58,21 @@
 				"          year = data.year",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
-				"     skipDuplicateMapOutputs: false) ~> flattenData"
+				"     skipDuplicateMapOutputs: false) ~> flattenData",
+				"selectColumns derive(abstract = iif(isNull(abstract), 'N/A', abstract),",
+				"          ingested_at = currentTimestamp(),",
+				"          authors = toString(authors_raw)) ~> transformColumns",
+				"transformColumns select(mapColumn(",
+				"          abstract,",
+				"          citationCount,",
+				"          paperId,",
+				"          title,",
+				"          year,",
+				"          ingested_at,",
+				"          authors",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> dropRawColumns"
 			]
 		}
 	}
