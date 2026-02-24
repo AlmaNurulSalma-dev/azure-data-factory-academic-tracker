@@ -1,0 +1,10 @@
+{
+	"name": "ls_keyvault_academic_tracker",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://kv-academic-tracker-dev.vault.azure.net/"
+		}
+	}
+}
