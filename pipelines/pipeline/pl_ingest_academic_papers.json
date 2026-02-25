@@ -173,6 +173,58 @@
 						"type": "DatasetReference"
 					}
 				]
+			},
+			{
+				"name": "notifyFailure",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "convert_to_parquet",
+						"dependencyConditions": [
+							"Failed"
+						]
+					},
+					{
+						"activity": "transform_papers",
+						"dependencyConditions": [
+							"Failed"
+						]
+					},
+					{
+						"activity": "copy_papers_from_api",
+						"dependencyConditions": [
+							"Failed"
+						]
+					},
+					{
+						"activity": "getApiKey",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"url": {
+						"value": "https://prod-48.eastus.logic.azure.com:443/workflows/bf5fa18f5c654b6b96bee5a67a1c788a/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=rSFODhoontK8qZ6sLdGS6XWlHs8ll8FO8sxxdiQ58Ps",
+						"type": "Expression"
+					},
+					"body": {
+						"value": "{\n    \"pipelineName\": \"@{pipeline().Pipeline}\",\n    \"status\": \"Failed\",\n    \"runId\": \"@{pipeline().RunId}\",\n    \"errorMessage\": \"@{activity('copy_papers_from_api').error.message}\",\n    \"time\": \"@{utcNow()}\"\n}\n```\n\n5. Sekarang connect activity ini sebagai **failure path** — klik arrow dari `convert_to_parquet`, tarik ke `notifyFailure`, lalu pilih kondisi **\"On failure\"** (warna merah)\n\n---\n\nPipeline flow sekarang:\n```\ngetApiKey\n    ↓\ncopy_papers_from_api ──(on failure)──→ notifyFailure\n    ↓\ntransform_papers\n    ↓\nconvert_to_parquet ──(on failure)──→ notifyFailure",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"annotations": []
