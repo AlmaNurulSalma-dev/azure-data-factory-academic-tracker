@@ -1,19 +1,21 @@
 {
-	"name": "ds_adls_papers_processed",
+	"name": "ds_adls_papers_parquet",
 	"properties": {
 		"linkedServiceName": {
 			"referenceName": "ls_adls_academic_tracker",
 			"type": "LinkedServiceReference"
 		},
 		"annotations": [],
-		"type": "Json",
+		"type": "Parquet",
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"folderPath": "papers",
+				"fileName": "papers.parquet",
+				"folderPath": "parquet",
 				"fileSystem": "processed"
-			}
+			},
+			"compressionCodec": "snappy"
 		},
-		"schema": {}
+		"schema": []
 	}
 }
