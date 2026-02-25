@@ -1,0 +1,519 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "adf-academic-tracker-dev"
+		},
+		"ls_adls_academic_tracker_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ls_adls_academic_tracker'"
+		},
+		"ls_adls_academic_tracker_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://acadtrackerdev001.dfs.core.windows.net/"
+		},
+		"ls_http_semantic_scholar_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://api.semanticscholar.org/graph/v1/"
+		},
+		"ls_keyvault_academic_tracker_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://kv-academic-tracker-dev.vault.azure.net/"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_ingest_academic_papers')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "copy_papers_from_api",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "getApiKey",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "HttpReadSettings",
+									"requestMethod": "GET",
+									"additionalHeaders": {
+										"value": "x-api-key: @{activity('getApiKey').output.value}",
+										"type": "Expression"
+									}
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "JsonSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings",
+									"copyBehavior": "MergeFiles"
+								},
+								"formatSettings": {
+									"type": "JsonWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_http_papers_source",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adls_papers_raw",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					},
+					{
+						"name": "transform_papers",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "copy_papers_from_api",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "df_transform_papers",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"rawPapers": {},
+									"sinkProcessed": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "getApiKey",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": "https://kv-academic-tracker-dev.vault.azure.net/secrets/semantic-scholar-api-key?api-version=7.0",
+							"authentication": {
+								"type": "MSI",
+								"resource": {
+									"value": "https://vault.azure.net",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "convert_to_parquet",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "transform_papers",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "JsonSource",
+								"storeSettings": {
+									"type": "AzureBlobFSReadSettings",
+									"recursive": true,
+									"wildcardFolderPath": "papers",
+									"wildcardFileName": "*.json",
+									"enablePartitionDiscovery": false
+								},
+								"formatSettings": {
+									"type": "JsonReadSettings"
+								}
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings",
+									"copyBehavior": "MergeFiles"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false
+						},
+						"inputs": [
+							{
+								"referenceName": "ds_adls_papers_processed",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "ds_adls_papers_parquet",
+								"type": "DatasetReference",
+								"parameters": {}
+							}
+						]
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_http_papers_source')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adls_papers_raw')]",
+				"[concat(variables('factoryId'), '/dataflows/df_transform_papers')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adls_papers_processed')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adls_papers_parquet')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adls_papers_parquet')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_academic_tracker",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "papers.parquet",
+						"folderPath": "parquet",
+						"fileSystem": "processed"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_academic_tracker')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adls_papers_processed')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_academic_tracker",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "papers",
+						"fileSystem": "processed"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_academic_tracker')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_adls_papers_raw')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_academic_tracker",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "papers.json",
+						"folderPath": "papers",
+						"fileSystem": "raw"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_academic_tracker')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_http_papers_source')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_http_semantic_scholar",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "HttpServerLocation",
+						"relativeUrl": {
+							"value": "paper/search?query=machine+learning&fields=title,authors,year,citationCount,abstract&limit=10",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_http_semantic_scholar')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls_academic_tracker')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_academic_tracker_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('ls_adls_academic_tracker_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_http_semantic_scholar')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "HttpServer",
+				"typeProperties": {
+					"url": "[parameters('ls_http_semantic_scholar_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "Anonymous"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_keyvault_academic_tracker')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('ls_keyvault_academic_tracker_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/df_transform_papers')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "ds_adls_papers_raw",
+								"type": "DatasetReference"
+							},
+							"name": "rawPapers"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "ds_adls_papers_processed",
+								"type": "DatasetReference"
+							},
+							"name": "sinkProcessed"
+						}
+					],
+					"transformations": [
+						{
+							"name": "selectColumns"
+						},
+						{
+							"name": "flattenData"
+						},
+						{
+							"name": "transformColumns"
+						},
+						{
+							"name": "dropRawColumns"
+						}
+					],
+					"scriptLines": [
+						"source(output(",
+						"          data as (abstract as string, authors as (authorId as long, name as string)[], citationCount as short, openAccessPdf as (disclaimer as string, license as string, status as string, url as string), paperId as string, title as string, year as short)[],",
+						"          next as short,",
+						"          offset as boolean,",
+						"          total as short",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     documentForm: 'documentPerLine') ~> rawPapers",
+						"flattenData select(mapColumn(",
+						"          abstract,",
+						"          authors_raw = authors,",
+						"          citationCount,",
+						"          paperId,",
+						"          title,",
+						"          year",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectColumns",
+						"rawPapers foldDown(unroll(data, data),",
+						"     mapColumn(",
+						"          abstract = data.abstract,",
+						"          authors = data.authors,",
+						"          citationCount = data.citationCount,",
+						"          paperId = data.paperId,",
+						"          title = data.title,",
+						"          year = data.year",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenData",
+						"selectColumns derive(abstract = iif(isNull(abstract), 'N/A', abstract),",
+						"          ingested_at = currentTimestamp(),",
+						"          authors = toString(authors_raw)) ~> transformColumns",
+						"transformColumns select(mapColumn(",
+						"          abstract,",
+						"          citationCount,",
+						"          paperId,",
+						"          title,",
+						"          year,",
+						"          ingested_at,",
+						"          authors",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> dropRawColumns",
+						"dropRawColumns sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkProcessed"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_adls_papers_raw')]",
+				"[concat(variables('factoryId'), '/datasets/ds_adls_papers_processed')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/tr_daily_ingest_papers')]",
+			"type": "Microsoft.DataFactory/factories/triggers",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "pl_ingest_academic_papers",
+							"type": "PipelineReference"
+						},
+						"parameters": {}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2026-02-25T07:02:00",
+						"timeZone": "SE Asia Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								8
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/pipelines/pl_ingest_academic_papers')]"
+			]
+		}
+	]
+}
